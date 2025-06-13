@@ -51,7 +51,7 @@ PARAMS = {
         "UF_CRM_1698688252221", "UF_CRM_1698761151613", "UF_CRM_1699452141037", "DATE_CREATE",
         "UF_CRM_1700661287551", "UF_CRM_1731588487", "UF_CRM_1700661252544", "UF_CRM_1731589190"
     ],
-    "filter[>=DATE_CREATE]": "2025-01-01",  # Alterado para filtrar a partir de 01/01/2025
+    "filter[>=DATE_CREATE]": "2025-01-01",  # Para testar deal 211266, altere para "2021-01-01" temporariamente
     "start": 0,
 }
 
@@ -84,6 +84,8 @@ def upsert_deal(conn, deal):
     try:
         with conn.cursor() as cur:
             print(f"\n📝 Inserindo/atualizando deal ID: {deal.get('ID')}")
+            if deal.get("ID") == "211266":
+                print(f"🔍 Deal ID 211266 encontrado! Dados: {deal}")
             data = (
                 deal.get("ID"), deal.get("TITLE"), deal.get("STAGE_ID"), deal.get("CATEGORY_ID"),
                 deal.get("UF_CRM_1700661314351"), deal.get("CONTACT_ID"), deal.get("DATE_CREATE"),

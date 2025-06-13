@@ -38,6 +38,20 @@ PARAMS = {
 
 PAGE_DELAY = 10
 
+def get_operadora_map():
+    try:
+        resp = requests.get(
+            "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.deal.fields"
+        )
+        data = resp.json()
+        items = data.get("result", {}).get("UF_CRM_1699452141037", {}).get("items", [])
+        return {item["ID"]: item["VALUE"] for item in items}
+    except Exception as e:
+        print("❌ Erro ao buscar operadoras:", e)
+        return {}
+
+
+
 def get_conn():
     print("🔌 Tentando conectar ao banco de dados...")
     conn = psycopg2.connect(**DB_PARAMS)

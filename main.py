@@ -18,6 +18,7 @@ def load_all_deals():
 
     while True:
         try:
+            print(f"📨 Fazendo requisição com start={start}") 
             response = requests.post(url, json={
                 "start": start,
                 "order": {"ID": "ASC"},

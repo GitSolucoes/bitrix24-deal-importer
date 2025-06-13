@@ -78,8 +78,7 @@ def upsert_deal(conn, deal):
         with conn.cursor() as cur:
             print(f"\n📝 Inserindo/atualizando deal ID: {deal.get('ID')}")
 
-            print("📌 Dados que serão inseridos no banco:")
-            print((
+            dados = (
                 deal.get("ID"), deal.get("TITLE"), deal.get("STAGE_ID"), deal.get("CATEGORY_ID"),
                 deal.get("UF_CRM_1700661314351"), deal.get("CONTACT_ID"), deal.get("DATE_CREATE"),
                 deal.get("UF_CRM_1698698407472"), deal.get("UF_CRM_1698698858832"),
@@ -90,7 +89,10 @@ def upsert_deal(conn, deal):
                 deal.get("UF_CRM_1698688252221"), deal.get("UF_CRM_1698761151613"),
                 deal.get("UF_CRM_1699452141037"), deal.get("UF_CRM_1700661287551"),
                 deal.get("UF_CRM_1731588487"), deal.get("UF_CRM_1700661252544"), deal.get("UF_CRM_1731589190")
-            ))
+            )
+
+            print("📌 Dados que serão inseridos no banco:")
+            print(dados)
 
             cur.execute("""
                 INSERT INTO deals (
@@ -124,20 +126,9 @@ def upsert_deal(conn, deal):
                     uf_crm_cidade = EXCLUDED.uf_crm_cidade,
                     uf_crm_numero = EXCLUDED.uf_crm_numero,
                     uf_crm_uf = EXCLUDED.uf_crm_uf;
-            """,
-            (
-                deal.get("ID"), deal.get("TITLE"), deal.get("STAGE_ID"), deal.get("CATEGORY_ID"),
-                deal.get("UF_CRM_1700661314351"), deal.get("CONTACT_ID"), deal.get("DATE_CREATE"),
-                deal.get("UF_CRM_1698698407472"), deal.get("UF_CRM_1698698858832"),
-                deal.get("UF_CRM_1697653896576"), deal.get("UF_CRM_1697762313423"),
-                deal.get("UF_CRM_1697763267151"), deal.get("UF_CRM_1697764091406"),
-                deal.get("UF_CRM_1697807340141"), deal.get("UF_CRM_1697807353336"),
-                deal.get("UF_CRM_1697807372536"), deal.get("UF_CRM_1697808018193"),
-                deal.get("UF_CRM_1698688252221"), deal.get("UF_CRM_1698761151613"),
-                deal.get("UF_CRM_1699452141037"), deal.get("UF_CRM_1700661287551"),
-                deal.get("UF_CRM_1731588487"), deal.get("UF_CRM_1700661252544"), deal.get("UF_CRM_1731589190")
-            ))
+            """, dados)
 
             print(f"✅ Deal {deal.get('ID')} inserido/atualizado com sucesso.")
+
     except Exception as e:
         print(f"❌ Erro ao inserir/atualizar deal {deal.get('ID')}: {e}")

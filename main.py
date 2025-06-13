@@ -31,6 +31,7 @@ PARAMS = {
         "UF_CRM_1697653896576", "UF_CRM_1697762313423", "UF_CRM_1697763267151", "UF_CRM_1697764091406",
         "UF_CRM_1697807340141", "UF_CRM_1697807353336", "UF_CRM_1697807372536", "UF_CRM_1697808018193",
         "UF_CRM_1698688252221", "UF_CRM_1698761151613", "UF_CRM_1699452141037", "DATE_CREATE",
+        "UF_CRM_1700661287551", "UF_CRM_1731588487", "UF_CRM_1700661252544", "UF_CRM_1731589190"
     ],
     "filter[>=DATE_CREATE]": "2024-09-01",
     "start": 0,
@@ -49,8 +50,6 @@ def get_operadora_map():
     except Exception as e:
         print("❌ Erro ao buscar operadoras:", e)
         return {}
-
-
 
 def get_conn():
     print("🔌 Tentando conectar ao banco de dados...")

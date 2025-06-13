@@ -125,7 +125,7 @@ def upsert_deal(conn, deal):
                     data_de_instalacao = EXCLUDED.data_de_instalacao,
                     quais_operadoras_tem_viabilidade = EXCLUDED.quais_operadoras_tem_viabilidade,
                     uf_crm_bairro = EXCLUDED.uf_crm_bairro,
-                    uf_c upon_cidade = EXCLUDED.uf_crm_cidade,
+                    uf_crm_cidade = EXCLUDED.uf_crm_cidade,
                     uf_crm_numero = EXCLUDED.uf_crm_numero,
                     uf_crm_uf = EXCLUDED.uf_crm_uf;
             """, data)

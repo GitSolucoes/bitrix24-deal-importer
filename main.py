@@ -7,6 +7,9 @@ from dateutil import parser
 from dotenv import load_dotenv
 import requests, time
 
+load_dotenv()
+
+
 WEBHOOK_CATEGORIES = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.dealcategory.list"
 WEBHOOK_STAGES = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.dealstage.list"
 

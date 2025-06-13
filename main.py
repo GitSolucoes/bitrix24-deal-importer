@@ -78,6 +78,7 @@ def process_deal(deal, categorias, estagios_por_categoria, operadora_map):
 
     return deal
 
+
 def main():
     print(f"🔁 Iniciando leitura paginada dos deals desde {DATA_INICIAL}...")
     start = 0

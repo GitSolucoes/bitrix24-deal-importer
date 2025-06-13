@@ -1,7 +1,3 @@
-fastapi
-uvicorn
 requests
-jinja2
-python-multipart
-pandas
-openpyxl
+psycopg2-binary
+flask

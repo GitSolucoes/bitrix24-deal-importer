@@ -71,12 +71,9 @@ def load_all_deals():
             response.raise_for_status()
             data = response.json()
             result = data.get("result", [])
-            if not result:
-                break
+            print("📥 IDs dos deals recebidos nesta página:", [deal.get("ID") for deal in result])
 
             all_deals.extend(result)
-            start = data.get("next")
-            print(f"📦 Total acumulado: {len(all_deals)} negócios")
 
             if not start:
                 break
@@ -105,6 +102,8 @@ def load_all_deals():
     conn = get_conn()
 
     sucesso = 0
+    ids_processados = []  # lista para guardar os IDs inseridos
+
     for deal in all_deals:
         try:
             print(f"🔍 Processando deal ID: {deal.get('ID')}")
@@ -123,12 +122,14 @@ def load_all_deals():
             deal["UF_CRM_1699452141037"] = ", ".join(filter(None, nomes))
             upsert_deal(conn, deal)
             sucesso += 1
+            ids_processados.append(deal.get('ID'))
         except Exception as e:
             print(f"⚠️ Erro ao processar deal {deal.get('ID')}: {e}")
 
     conn.commit()
     conn.close()
     print(f"✅ Inseridos {sucesso} de {len(all_deals)} negócios antigos com sucesso.")
+    print(f"📋 IDs atualizados no banco: {ids_processados}")
 
 if __name__ == "__main__":
     load_all_deals()

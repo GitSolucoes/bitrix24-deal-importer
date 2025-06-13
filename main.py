@@ -38,6 +38,12 @@ PARAMS = {
 }
 
 PAGE_DELAY = 10
+_CACHE_TTL = 3600  # tempo de vida do cache em segundos (1 hora)
+
+_cache = {
+    "categories": {"data": {}, "timestamp": 0},
+    "stages": {},  # cache separado por CATEGORY_ID
+}
 
 def get_operadora_map():
     try:

@@ -72,6 +72,10 @@ PARAMS = {
         "UF_CRM_1698688252221",  # Rua
         "UF_CRM_1698761151613",  # Data de instalação
         "UF_CRM_1699452141037",  # Quais operadoras tem viabilidade?
+        "UF_CRM_1700661287551",  # bairro
+        "UF_CRM_1731588487",     # cidade
+        "UF_CRM_1700661252544",  # número
+        "UF_CRM_1731589190",     # uf
         "DATE_CREATE",
     ],
     "filter[>=DATE_CREATE]": "2021-01-01",

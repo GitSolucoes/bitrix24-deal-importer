@@ -1,20 +1,17 @@
-# Use uma imagem oficial do Python como base
+# Dockerfile
 FROM python:3.10-slim
 
-# Define o diretório de trabalho dentro do container
+# Diretório de trabalho
 WORKDIR /app
 
-# Copia os arquivos de requirements para dentro do container
-COPY requirements.txt .
-
-# Instala as dependências
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copia todo o código da aplicação para o container
+# Copia tudo pro container
 COPY . .
 
-# Expõe a porta que seu app vai rodar (mude conforme sua app)
+# Instala dependências
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Porta opcional para expor se usar API
 EXPOSE 1421
 
-# Comando para rodar sua aplicação (mude conforme seu entrypoint)
+# Comando para rodar o script
 CMD ["python", "main.py"]

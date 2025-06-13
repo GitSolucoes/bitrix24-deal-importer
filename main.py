@@ -13,6 +13,9 @@ WEBHOOK_STAGES = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry
 _cache = {"categories": {"data": None, "timestamp": 0}, "stages": {}}
 _CACHE_TTL = 3600  # 1 hora
 
+# 🔎 Data mínima para importar (formato YYYY-MM-DD)
+DATA_INICIAL = "2025-01-01"
+
 def fetch_with_retry(url, params=None, retries=3, backoff=1):
     for attempt in range(retries):
         try:
@@ -48,13 +51,11 @@ def get_stages(cat_id):
     return stages
 
 def process_deal(deal, categorias, estagios_por_categoria, operadora_map):
-    # Datas
     if "DATE_CREATE" in deal:
         deal["DATE_CREATE"] = format_date(deal["DATE_CREATE"])
     if "UF_CRM_1698761151613" in deal:
         deal["UF_CRM_1698761151613"] = format_date(deal["UF_CRM_1698761151613"])
 
-    # Categoria e estágio
     cat_id = deal.get("CATEGORY_ID")
     stage_id = deal.get("STAGE_ID")
     if cat_id in categorias:
@@ -62,7 +63,6 @@ def process_deal(deal, categorias, estagios_por_categoria, operadora_map):
     if cat_id in estagios_por_categoria and stage_id in estagios_por_categoria[cat_id]:
         deal["STAGE_ID"] = estagios_por_categoria[cat_id][stage_id]
 
-    # Operadora
     ids = deal.get("UF_CRM_1699452141037", [])
     if not isinstance(ids, list):
         ids = []
@@ -73,7 +73,7 @@ def process_deal(deal, categorias, estagios_por_categoria, operadora_map):
     return deal
 
 def main():
-    print("🔁 Iniciando leitura paginada dos deals...")
+    print(f"🔁 Iniciando leitura paginada dos deals desde {DATA_INICIAL}...")
     start = 0
     total = 0
 
@@ -89,7 +89,8 @@ def main():
             "select[]": [
                 "ID", "TITLE", "CATEGORY_ID", "STAGE_ID", "DATE_CREATE",
                 "UF_CRM_1698761151613", "UF_CRM_1699452141037"
-            ]
+            ],
+            "filter[>=DATE_CREATE]": DATA_INICIAL
         }
         data = fetch_with_retry(BITRIX_WEBHOOK, params=params)
 
@@ -115,7 +116,7 @@ def main():
 
     conn.commit()
     conn.close()
-    print(f"🎉 Concluído! {total} negócios processados.")
+    print(f"🎉 Concluído! {total} negócios processados desde {DATA_INICIAL}.")
 
 if __name__ == "__main__":
     main()

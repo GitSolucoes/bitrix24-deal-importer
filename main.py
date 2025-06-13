@@ -21,7 +21,7 @@ def load_all_deals():
             response = requests.post(url, json={
                 "start": start,
                 "order": {"ID": "ASC"},
-                "filter": {">=DATE_CREATE": "2024-02-01T00:00:00Z"},
+                "filter": {">=DATE_CREATE": "2024-02-09T00:00:00Z"},
                 "select": ["*"]
             }, timeout=300)
             response.raise_for_status()
@@ -52,23 +52,25 @@ def load_all_deals():
     conn = get_conn()
 
     for deal in all_deals:
-        try:
-            if "DATE_CREATE" in deal:
-                deal["DATE_CREATE"] = format_date(deal["DATE_CREATE"])
-            if "UF_CRM_1698761151613" in deal:
-                deal["UF_CRM_1698761151613"] = format_date(deal["UF_CRM_1698761151613"])
-            cat_id = deal.get("CATEGORY_ID")
-            stage_id = deal.get("STAGE_ID")
-            deal["CATEGORY_ID"] = categorias.get(cat_id, cat_id)
-            deal["STAGE_ID"] = estagios.get(cat_id, {}).get(stage_id, stage_id)
-            ids = deal.get("UF_CRM_1699452141037", [])
-            if not isinstance(ids, list):
-                ids = []
-            nomes = [operadora_map.get(str(i)) for i in ids if str(i) in operadora_map]
-            deal["UF_CRM_1699452141037"] = ", ".join(filter(None, nomes))
-            upsert_deal(conn, deal)
-        except Exception as e:
-            print(f"⚠️ Erro ao processar deal {deal.get('ID')}: {e}")
+    try:
+        print(f"🔍 Processando deal ID: {deal.get('ID')}")  # <-- novo
+        if "DATE_CREATE" in deal:
+            deal["DATE_CREATE"] = format_date(deal["DATE_CREATE"])
+        if "UF_CRM_1698761151613" in deal:
+            deal["UF_CRM_1698761151613"] = format_date(deal["UF_CRM_1698761151613"])
+        cat_id = deal.get("CATEGORY_ID")
+        stage_id = deal.get("STAGE_ID")
+        deal["CATEGORY_ID"] = categorias.get(cat_id, cat_id)
+        deal["STAGE_ID"] = estagios.get(cat_id, {}).get(stage_id, stage_id)
+        ids = deal.get("UF_CRM_1699452141037", [])
+        if not isinstance(ids, list):
+            ids = []
+        nomes = [operadora_map.get(str(i)) for i in ids if str(i) in operadora_map]
+        deal["UF_CRM_1699452141037"] = ", ".join(filter(None, nomes))
+        upsert_deal(conn, deal)
+    except Exception as e:
+        print(f"⚠️ Erro ao processar deal {deal.get('ID')}: {e}")
+
 
     conn.commit()
     conn.close()

@@ -76,4 +76,4 @@ def load_all_deals():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=1421)
+    app.run(host="0.0.0.0", port=1321)

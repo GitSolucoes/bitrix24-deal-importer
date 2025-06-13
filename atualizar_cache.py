@@ -37,17 +37,10 @@ WEBHOOK_STAGES = [
     "https://marketingsolucoes.bitrix24.com.br/rest/5332/y5q6wd4evy5o57ze/crm.dealcategory.stage.list",
 ]
 
-def get_operadora_map():
-    try:
-        resp = requests.get(
-            "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.deal.fields"
-        )
-        data = resp.json()
-        items = data.get("result", {}).get("UF_CRM_1699452141037", {}).get("items", [])
-        return {item["ID"]: item["VALUE"] for item in items}
-    except Exception as e:
-        print("❌ Erro ao buscar operadoras:", e)
-        return {}
+WEBHOOK_FIELDS = [
+    "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.deal.fields",
+    "https://marketingsolucoes.bitrix24.com.br/rest/5332/y5q6wd4evy5o57ze/crm.deal.fields",
+]
 
 PARAMS = {
     "select[]": [
@@ -73,7 +66,7 @@ def get_conn():
         conn = psycopg2.connect(**DB_PARAMS)
         return conn
     except psycopg2.Error as e:
-        print(f"❌ Erro ao conectar ao banco de dados: {e}")
+        print(f"❌ Erro ao conectar ao banco de dados: {e.pgerror}")
         raise
 
 def format_date(date_str):
@@ -103,9 +96,6 @@ def upsert_deal(conn, deal):
                 deal.get("UF_CRM_1699452141037"), deal.get("UF_CRM_1700661287551"),
                 deal.get("UF_CRM_1731588487"), deal.get("UF_CRM_1700661252544"), deal.get("UF_CRM_1731589190")
             )
-            if any(d is None for d in data if d not in [None, "", "0"]):
-                print(f"⚠ Dados incompletos para deal ID {deal.get('ID')}: {data}")
-                return
             cur.execute("""
                 INSERT INTO deals (
                     id, title, stage_id, category_id, uf_crm_cep, uf_crm_contato, date_create,
@@ -135,7 +125,7 @@ def upsert_deal(conn, deal):
                     data_de_instalacao = EXCLUDED.data_de_instalacao,
                     quais_operadoras_tem_viabilidade = EXCLUDED.quais_operadoras_tem_viabilidade,
                     uf_crm_bairro = EXCLUDED.uf_crm_bairro,
-                    uf_crm_cidade = EXCLUDED.uf_crm_cidade,
+                    uf_c upon_cidade = EXCLUDED.uf_crm_cidade,
                     uf_crm_numero = EXCLUDED.uf_crm_numero,
                     uf_crm_uf = EXCLUDED.uf_crm_uf;
             """, data)
@@ -147,5 +137,23 @@ def upsert_deal(conn, deal):
         print(f"❌ Erro geral ao inserir/atualizar deal {deal.get('ID')}: {e}")
         raise
 
-def get_operadora_map():
-    return operadora_map
+def get_operadora_map(webhook):
+    try:
+        for attempt in range(MAX_RETRIES):
+            try:
+                resp = requests.get(webhook, timeout=15)
+                resp.raise_for_status()
+                data = resp.json()
+                items = data.get("result", {}).get("UF_CRM_1699452141037", {}).get("items", [])
+                operadora_map = {item["ID"]: item["VALUE"] for item in items}
+                if not operadora_map:
+                    print(f"⚠ Nenhum mapeamento de operadoras retornado por {webhook}")
+                return operadora_map
+            except requests.RequestException as e:
+                print(f"❌ Erro {attempt+1}/{MAX_RETRIES} ao buscar operadoras em {webhook}: {e}")
+                time.sleep(RETRY_DELAY * (2 ** attempt))
+        print(f"❌ Falha ao buscar operadoras após {MAX_RETRIES} tentativas.")
+        return {}
+    except Exception as e:
+        print(f"❌ Erro geral ao buscar operadoras: {e}")
+        return {}

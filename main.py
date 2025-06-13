@@ -1,32 +1,50 @@
 import requests
 import time
-from atualizar_cache import get_conn, upsert_deal, format_date, get_operadora_map, WEBHOOKS, WEBHOOK_CATEGORIES, WEBHOOK_STAGES, MAX_RETRIES, RETRY_DELAY
+from atualizar_cache import get_conn, upsert_deal, format_date, get_operadora_map, WEBHOOKS, WEBHOOK_CATEGORIES, WEBHOOK_STAGES, WEBHOOK_FIELDS, MAX_RETRIES, RETRY_DELAY, REQUEST_DELAY, PAGE_DELAY, LIMITE_REGISTROS_TURBO, PARAMS
 
 # Cache simples
 _cache = {"categories": {"data": None, "timestamp": 0}, "stages": {}}
 _CACHE_TTL = 3600  # 1 hora
 
-def fetch_with_retry(url, params=None, retries=MAX_RETRIES, backoff=RETRY_DELAY):
-    for attempt in range(retries):
-        try:
-            resp = requests.get(url, params=params, timeout=15)
-            resp.raise_for_status()
-            return resp.json()
-        except requests.RequestException as e:
-            print(f"❌ Erro {attempt+1}/{retries} ao buscar {url}: {e}")
-            time.sleep(backoff * (2 ** attempt))
-    raise Exception(f"Erro após {retries} tentativas")
+def fetch_with_retry(webhooks, params=None):
+    for webhook in webhooks:
+        for attempt in range(MAX_RETRIES):
+            try:
+                resp = requests.get(webhook, params=params, timeout=15)
+                if resp.status_code == 429:
+                    retry_after = int(resp.headers.get("Retry-After", RETRY_DELAY))
+                    print(f"⏳ Limite de requisições atingido para {webhook}: aguardando {retry_after}s...")
+                    time.sleep(retry_after)
+                    continue
+                resp.raise_for_status()
+                print(f"✅ Sucesso com {webhook}")
+                return resp.json()
+            except requests.RequestException as e:
+                print(f"❌ Erro {attempt+1}/{MAX_RETRIES} ao buscar {webhook}: {e}")
+                time.sleep(RETRY_DELAY * (2 ** attempt))
+        print(f"❌ Falha ao buscar {webhook} após {MAX_RETRIES} tentativas.")
+    print("🚫 Todos os webhooks falharam.")
+    return None
 
 def get_categories(webhook):
     now = time.time()
     if _cache["categories"]["data"] and now - _cache["categories"]["timestamp"] < _CACHE_TTL:
         return _cache["categories"]["data"]
     
-    data = fetch_with_retry(webhook)
-    categorias = {c["ID"]: c["NAME"] for c in data.get("result", [])}
-    _cache["categories"]["data"] = categorias
+    params = {"start": 0}
+    categories = {}
+    while True:
+        data = fetch_with_retry([webhook], params=params)
+        if data is None:
+            break
+        for cat in data.get("result", []):
+            categories[cat["ID"]] = cat["NAME"]
+        if "next" not in data:
+            break
+        params["start"] = data["next"]
+    _cache["categories"]["data"] = categories
     _cache["categories"]["timestamp"] = now
-    return categorias
+    return categories
 
 def get_stages(cat_id, webhook):
     now = time.time()
@@ -34,9 +52,17 @@ def get_stages(cat_id, webhook):
         if now - _cache["stages"][cat_id]["timestamp"] < _CACHE_TTL:
             return _cache["stages"][cat_id]["data"]
     
-    params = {"id": cat_id}
-    data = fetch_with_retry(webhook, params=params)
-    stages = {s["STATUS_ID"]: s["NAME"] for s in data.get("result", [])}
+    params = {"id": cat_id, "start": 0}
+    stages = {}
+    while True:
+        data = fetch_with_retry([webhook], params=params)
+        if data is None:
+            break
+        for stage in data.get("result", []):
+            stages[stage["STATUS_ID"]] = stage["NAME"]
+        if "next" not in data:
+            break
+        params["start"] = data["next"]
     _cache["stages"][cat_id] = {"data": stages, "timestamp": now}
     return stages
 
@@ -65,34 +91,34 @@ def process_deal(deal, categorias, estagios_por_categoria, operadora_map):
 
     return deal
 
-def process_webhook(webhook_deals, webhook_categories, webhook_stages):
+def process_webhook(webhook_deals, webhook_categories, webhook_stages, webhook_fields):
     print(f"🔁 Iniciando leitura paginada dos deals para {webhook_deals}...")
     start = 0
     total = 0
+    tentativas = 0
 
     categorias = get_categories(webhook_categories)
     estagios_por_categoria = {cat: get_stages(cat, webhook_stages) for cat in categorias}
-    operadora_map = get_operadora_map()
+    operadora_map = get_operadora_map(webhook_fields)
 
     conn = get_conn()
     
     try:
         while True:
-            params = {
-                "start": start,
-                "select[]": [
-                    "ID", "TITLE", "CATEGORY_ID", "STAGE_ID", "DATE_CREATE",
-                    "UF_CRM_1698761151613", "UF_CRM_1699452141037",
-                    "UF_CRM_1700661314351", "UF_CRM_1698698407472", "UF_CRM_1698698858832",
-                    "UF_CRM_1697653896576", "UF_CRM_1697762313423", "UF_CRM_1697763267151",
-                    "UF_CRM_1697764091406", "UF_CRM_1697807340141", "UF_CRM_1697807353336",
-                    "UF_CRM_1697807372536", "UF_CRM_1697808018193", "UF_CRM_1698688252221",
-                    "UF_CRM_1700661287551", "UF_CRM_1731588487", "UF_CRM_1700661252544",
-                    "UF_CRM_1731589190"
-                ]
-            }
-            data = fetch_with_retry(webhook_deals, params=params)
+            local_params = PARAMS.copy()
+            local_params["start"] = start
+            print(f"📡 Requisição start={start} | Total acumulado: {total}")
+            data = fetch_with_retry([webhook_deals], params=local_params)
+            if data is None:
+                tentativas += 1
+                if tentativas >= MAX_RETRIES:
+                    print(f"🚫 Máximo de tentativas ({MAX_RETRIES}) atingido para {webhook_deals}. Abortando.")
+                    break
+                print(f"⏳ Retentativa {tentativas}/{MAX_RETRIES} em {RETRY_DELAY}s...")
+                time.sleep(RETRY_DELAY)
+                continue
 
+            tentativas = 0
             deals = data.get("result", [])
             if not deals:
                 break
@@ -111,6 +137,7 @@ def process_webhook(webhook_deals, webhook_categories, webhook_stages):
             if "next" not in data:
                 break
             start = data["next"]
+            time.sleep(PAGE_DELAY if total >= LIMITE_REGISTROS_TURBO else REQUEST_DELAY)
 
         conn.commit()
     except Exception as e:
@@ -124,9 +151,9 @@ def process_webhook(webhook_deals, webhook_categories, webhook_stages):
 
 def main():
     total_geral = 0
-    for i, (webhook_deals, webhook_categories, webhook_stages) in enumerate(zip(WEBHOOKS, WEBHOOK_CATEGORIES, WEBHOOK_STAGES)):
+    for i, (webhook_deals, webhook_categories, webhook_stages, webhook_fields) in enumerate(zip(WEBHOOKS, WEBHOOK_CATEGORIES, WEBHOOK_STAGES, WEBHOOK_FIELDS)):
         print(f"\n🌐 Processando instância {i+1}/{len(WEBHOOKS)}")
-        total_geral += process_webhook(webhook_deals, webhook_categories, webhook_stages)
+        total_geral += process_webhook(webhook_deals, webhook_categories, webhook_stages, webhook_fields)
     print(f"\n🏁 Total geral: {total_geral} negócios processados em todas as instâncias.")
 
 if __name__ == "__main__":

@@ -242,3 +242,36 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+print("🧪 Teste final: buscando 1 deal manualmente para ver se insere")
+
+fake_deal = {
+    "ID": 999999,
+    "TITLE": "Deal Teste",
+    "STAGE_ID": "NEW",
+    "CATEGORY_ID": "0",
+    "UF_CRM_1700661314351": "00000-000",
+    "CONTACT_ID": "1",
+    "DATE_CREATE": "2024-10-01T00:00:00+03:00",
+    "UF_CRM_1698698407472": "Contato 01",
+    "UF_CRM_1698698858832": "Contato 02",
+    "UF_CRM_1697653896576": "1234",
+    "UF_CRM_1697762313423": "João",
+    "UF_CRM_1697763267151": "Maria",
+    "UF_CRM_1697764091406": "2024-10-10",
+    "UF_CRM_1697807340141": "email@email.com",
+    "UF_CRM_1697807353336": "000.000.000-00",
+    "UF_CRM_1697807372536": "123456",
+    "UF_CRM_1697808018193": "Referência",
+    "UF_CRM_1698688252221": "Rua Teste",
+    "UF_CRM_1698761151613": "2024-11-11",
+    "UF_CRM_1699452141037": "Vivo",
+    "UF_CRM_1700661287551": "Bairro X",
+    "UF_CRM_1731588487": "Cidade Y",
+    "UF_CRM_1700661252544": "123",
+    "UF_CRM_1731589190": "SP",
+}
+
+upsert_deal(conn, fake_deal)
+conn.commit()

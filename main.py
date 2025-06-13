@@ -183,19 +183,29 @@ def upsert_deal(conn, deal):
         )
 
 
-def fetch_deals(url):
-    print(f"🌐 Requisição para {url}")
-    try:
-        response = requests.get(url, params=PARAMS)
-        print(f"📶 Status HTTP: {response.status_code}")
+def fetch_all_deals(url):
+    start = 0
+    all_deals = []
+
+    while True:
+        params = PARAMS.copy()
+        params["start"] = start
+
+        response = requests.get(url, params=params)
         response.raise_for_status()
-        json_data = response.json()
-        result = json_data.get("result", [])
-        print(f"📥 Recebidos {len(result)} deals da URL: {url}")
-        return result
-    except Exception as e:
-        print(f"❌ Erro ao buscar deals de {url}: {e}")
-        return []
+        data = response.json()
+        result = data.get("result", [])
+        all_deals.extend(result)
+
+        print(f"📥 Recebidos {len(result)} negócios com start={start}")
+
+        if "next" in data:
+            start = data["next"]
+        else:
+            break
+
+    return all_deals
+
 
 def main():
     print("\n🚀 Script iniciado em:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
@@ -208,7 +218,7 @@ def main():
 
         for url in WEBHOOKS:
             print(f"\n🔁 Processando webhook: {url}")
-            deals = fetch_deals(url)
+            deals = fetch_all_deals(url)
             print(f"🔍 {len(deals)} deals obtidos")
 
             for deal in deals:

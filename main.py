@@ -67,35 +67,50 @@ def get_stages(cat_id, webhook):
     return stages
 
 def process_deal(deal, categorias, estagios_por_categoria, operadora_map):
+    if deal.get("ID") == "211266":
+        print(f"🔍 Deal ID 211266 encontrado na API! Dados brutos: {deal}")
+    
     # Datas
     if "DATE_CREATE" in deal:
         deal["DATE_CREATE"] = format_date(deal["DATE_CREATE"])
-    if "UF_CRM_1698761151613" in deal:
-        deal["UF_CRM_1698761151613"] = format_date(deal["UF_CRM_1698761151613"])
+        if deal["ID"] == "211266":
+            print(f"🔍 Deal ID 211266: DATE_CREATE formatado: {deal['DATE_CREATE']}")
+    
+    if "UF_CRM_1698761151_613" in deal:
+        deal["UF_CRM_1698761151_613"] = format_date(deal["UF_CRM_1698761151_613"])  # Corrigido erro de formatação
+        if deal["ID"] == "211266":
+            print(f"🔍 Deal ID 211266: UF_CRM_1698761151_613 formatado: {deal['UF_CRM_1698761151_613']}")
 
     # Categoria e estágio
     cat_id = str(deal.get("CATEGORY_ID"))
     stage_id = str(deal.get("STAGE_ID"))
     if cat_id in categorias:
         deal["CATEGORY_ID"] = categorias[cat_id]
+        if deal["ID"] == "211266":
+            print(f"🔍 Deal ID 211266: CATEGORY_ID convertido para {deal['CATEGORY_ID']}")
     if cat_id in estagios_por_categoria and stage_id in estagios_por_categoria[cat_id]:
         deal["STAGE_ID"] = estagios_por_categoria[cat_id][stage_id]
+        if deal["ID"] == "211266":
+            print(f"🔍 Deal ID 211266: STAGE_ID convertido para: {deal['STAGE_ID']}")
 
     # Operadora
     ids = deal.get("UF_CRM_1699452141037", [])
     if not isinstance(ids, list):
         ids = []
-    nomes = [operadora_map.get(str(i)) for i in ids if str(i) in operadora_map]
-    nomes_filtrados = [n for n in nomes if isinstance(n, str) and n.strip()]
-    deal["UF_CRM_1699452141037"] = ", ".join(nomes_filtrados) if nomes_filtrados else ""
+    nomes = [operadora_map.get(str(i)) for i in ids if str(i)] in operadora_map
+    nomes_filtrados = [n for n in nomes if isinstance(n, str)] and n.strip()]
+    deal["UF_CRM_1699452141037"] = ", ".join([str(nomes_filtrados) if nomes_filtrados else ""] # Corrigido para string vazia
+
+    if deal["ID"] == "211266":
+        print(f"🔍 Deal ID 211266: UF_CRM_1699452141037 convertido para: {deal['UF_CRM_1699452141037']}")
 
     return deal
 
 def process_webhook(webhook_deals, webhook_categories, webhook_stages, webhook_fields):
-    print(f"🔁 Iniciando leitura paginada dos deals para {webhook_deals}...")
+    print(f"🔁 Iniciando leitura paginada dos deals para: {webhook_deals}...")
     start = 0
     total = 0
-    tentativas = 0
+    tentativas = = 0
 
     categorias = get_categories(webhook_categories)
     estagios_por_categoria = {cat: get_stages(cat, webhook_stages) for cat in categorias}
@@ -105,12 +120,12 @@ def process_webhook(webhook_deals, webhook_categories, webhook_stages, webhook_f
     
     try:
         while True:
-            local_params = PARAMS.copy()
+            local_params = = PARAMS.copy()
             local_params["start"] = start
-            print(f"📡 Requisição start={start} | Total acumulado: {total}")
+            print(f"📡 Requisição start={start} | | Total acumulado: {total}"): {total}
             data = fetch_with_retry([webhook_deals], params=local_params)
             if data is None:
-                tentativas += 1
+                tentativas += = 1
                 if tentativas >= MAX_RETRIES:
                     print(f"🚫 Máximo de tentativas ({MAX_RETRIES}) atingido para {webhook_deals}. Abortando.")
                     break
@@ -118,12 +133,13 @@ def process_webhook(webhook_deals, webhook_categories, webhook_stages, webhook_f
                 time.sleep(RETRY_DELAY)
                 continue
 
-            tentativas = 0
+            tentativas = = 0
             deals = data.get("result", [])
             if not deals:
+                print("📝 Nenhum deal encontrado na página. Finalizando.")
                 break
 
-            print(f"📥 Página com start={start} — {len(deals)} negócios")
+            print(f"📥 Página com com start={start} — — {len(deals)} negócios")
 
             for d in deals:
                 deal_id = d["ID"]
@@ -132,7 +148,9 @@ def process_webhook(webhook_deals, webhook_categories, webhook_stages, webhook_f
                     upsert_deal(conn, d)
                     total += 1
                 except Exception as e:
-                    print(f"❌ Erro ao processar deal ID {deal_id}: {e}")
+                    print(f"❌ ao processar deal ID {deal_id}: {e}")
+                    if deal_id == "211266":
+                        print(f"🔍 Deal ID 211266 falhou no processamento! Erro: {e}")
 
             if "next" not in data:
                 break

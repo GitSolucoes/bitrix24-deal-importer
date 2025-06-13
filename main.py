@@ -32,11 +32,11 @@ PARAMS = {
         "UF_CRM_1697807340141", "UF_CRM_1697807353336", "UF_CRM_1697807372536", "UF_CRM_1697808018193",
         "UF_CRM_1698688252221", "UF_CRM_1698761151613", "UF_CRM_1699452141037", "DATE_CREATE",
     ],
-    "filter[>=DATE_CREATE]": "2024-01-01",
+    "filter[>=DATE_CREATE]": "2024-09-01",
     "start": 0,
 }
 
-PAGE_DELAY = 30
+PAGE_DELAY =10
 
 def get_conn():
     print("🔌 Tentando conectar ao banco de dados...")

@@ -51,7 +51,7 @@ PARAMS = {
         "UF_CRM_1698688252221", "UF_CRM_1698761151613", "UF_CRM_1699452141037", "DATE_CREATE",
         "UF_CRM_1700661287551", "UF_CRM_1731588487", "UF_CRM_1700661252544", "UF_CRM_1731589190"
     ],
-    "filter[>=DATE_CREATE]": "2021-01-01",
+    "filter[>=DATE_CREATE]": "2025-01-01",  # Alterado para filtrar a partir de 01/01/2025
     "start": 0,
 }
 

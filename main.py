@@ -248,9 +248,97 @@ def load_all_deals():
 
     conn.commit()
     conn.close()
+    
 
     print(f"✅ Inseridos {sucesso} de {len(all_deals)} negócios antigos com sucesso.")
     print(f"📋 IDs atualizados no banco: {ids_atualizados}")
+
+
+def baixar_todos_dados():
+    conn = get_conn()
+    conn.autocommit = False
+    todos = []
+    local_params = PARAMS.copy()
+    tentativas = 0
+
+    print("🚀 Buscando operadoras dinamicamente...")
+    operadora_map = get_operadora_map()
+
+
+    print("🚀 Buscando categorias para mapear nomes...")
+    categorias = get_categories()
+
+    print("🚀 Buscando estágios para todas as categorias...")
+    estagios_por_categoria = {}
+    for cat_id in categorias.keys():
+        estagios_por_categoria[cat_id] = get_stages(cat_id)
+
+    while True:
+        print(
+            f"📡 Requisição start={local_params['start']} | Total acumulado: {len(todos)}"
+        )
+        data = fazer_requisicao(WEBHOOKS, local_params)
+        if data is None:
+            tentativas += 1
+            if tentativas >= MAX_RETRIES:
+                print("🚫 Máximo de tentativas. Abortando.")
+                break
+            print(f"⏳ Retentativa {tentativas}/{MAX_RETRIES} em {RETRY_DELAY}s...")
+            time.sleep(RETRY_DELAY)
+            continue
+
+        tentativas = 0
+        deals = data.get("result", [])
+
+        # Substituir IDs por nomes antes de salvar:
+        for deal in deals:
+            cat_id = deal.get("CATEGORY_ID")
+            stage_id = deal.get("STAGE_ID")
+        
+            # Substitui categoria e estágio por nome
+            if cat_id in categorias:
+                deal["CATEGORY_ID"] = categorias[cat_id]
+            if cat_id in estagios_por_categoria and stage_id in estagios_por_categoria[cat_id]:
+                deal["STAGE_ID"] = estagios_por_categoria[cat_id][stage_id]
+        
+            # ✅ Converte IDs de operadoras para nomes
+            ids = deal.get("UF_CRM_1699452141037", [])
+            if not isinstance(ids, list):
+                ids = []
+            nomes = [operadora_map.get(str(i)) for i in ids if str(i) in operadora_map]
+            nomes_filtrados = [n for n in nomes if isinstance(n, str) and n.strip()]
+            deal["UF_CRM_1699452141037"] = ", ".join(nomes_filtrados) if nomes_filtrados else ""
+        
+            # ✅ Formata a data de criação
+            deal["DATE_CREATE"] = format_date(deal.get("DATE_CREATE"))
+            deal["UF_CRM_1698761151613"] = format_date(deal.get("UF_CRM_1698761151613"))
+
+
+        
+            # ⬇️ Grava no banco
+            upsert_deal(conn, deal)
+
+
+
+
+        todos.extend(deals)
+        conn.commit()
+        print(f"💾 Processados {len(deals)} registros.")
+
+        if "next" in data and data["next"]:
+            local_params["start"] = data["next"]
+            time.sleep(
+                PAGE_DELAY if len(todos) >= LIMITE_REGISTROS_TURBO else REQUEST_DELAY
+            )
+        else:
+            print("🏁 Fim da paginação.")
+            break
+
+    conn.close()
+    return todos
+
+
+
 
 if __name__ == "__main__":
     load_all_deals()

@@ -1,4 +1,10 @@
-from atualizar_cache import get_conn, format_date, get_operadora_map, upsert_deal
+import psycopg2
+import requests
+import time
+import os
+from datetime import datetime
+from dateutil import parser 
+from dotenv import load_dotenv
 import requests, time
 
 WEBHOOK_CATEGORIES = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.dealcategory.list"

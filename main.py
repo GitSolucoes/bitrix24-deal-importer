@@ -1,4 +1,4 @@
-from atualizar_cache import get_conn, upsert_deal, format_date
+from atualizar_cache.py import get_conn, format_date, get_operadora_map, upsert_deal
 import requests, time
 
 WEBHOOK_CATEGORIES = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.dealcategory.list"

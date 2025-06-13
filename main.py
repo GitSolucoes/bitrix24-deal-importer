@@ -1,14 +1,57 @@
-# carga_antigos.py
 from atualizar_cache import get_conn, upsert_deal, format_date, get_operadora_map
 import requests, time
 
-def get_categories():
-    # Igual ao outro
-    ...
+WEBHOOK_CATEGORIES = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.dealcategory.list"
+WEBHOOK_STAGES = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.dealstage.list"
 
-def get_stages(cat_id):
-    # Igual ao outro
-    ...
+def fazer_requisicao(url, params):
+    while True:
+        try:
+            resp = requests.post(url, json=params, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+            return data
+        except requests.exceptions.HTTPError as e:
+            if resp.status_code == 429:
+                print("⏳ Limite de requisições atingido. Aguardando 60 segundos...")
+                time.sleep(60)
+            else:
+                print(f"❌ Erro na requisição: {e}")
+                return None
+        except Exception as e:
+            print(f"❌ Erro inesperado na requisição: {e}")
+            return None
+
+def get_categories():
+    params = {"start": 0}
+    categories = {}
+    while True:
+        data = fazer_requisicao(WEBHOOK_CATEGORIES, params)
+        if not data:
+            break
+        for cat in data.get("result", []):
+            categories[cat["ID"]] = cat["NAME"]
+        if data.get("next"):
+            params["start"] = data["next"]
+        else:
+            break
+    return categories
+
+def get_stages(category_id):
+    params = {"id": category_id, "start": 0}
+    stages = {}
+    while True:
+        data = fazer_requisicao(WEBHOOK_STAGES, params)
+        if not data:
+            print(f"🚫 Falha ao obter estágios para categoria {category_id}")
+            break
+        for stage in data.get("result", []):
+            stages[stage["STATUS_ID"]] = stage["NAME"]
+        if data.get("next"):
+            params["start"] = data["next"]
+        else:
+            break
+    return stages
 
 def load_all_deals():
     print("🔁 Iniciando carga completa de negócios antigos...")
@@ -43,8 +86,8 @@ def load_all_deals():
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 429:
                 print("⏳ Limite de requisições atingido. Aguardando 60 segundos...")
-                time.sleep(60)  # espera para liberar o limite
-                continue  # tenta de novo
+                time.sleep(60)
+                continue
             else:
                 print(f"❌ Erro durante paginação: {e}")
                 break
@@ -61,8 +104,7 @@ def load_all_deals():
     operadora_map = get_operadora_map()
     conn = get_conn()
 
-    sucesso = 0  # contador de deals bem inseridos
-
+    sucesso = 0
     for deal in all_deals:
         try:
             print(f"🔍 Processando deal ID: {deal.get('ID')}")
@@ -87,7 +129,6 @@ def load_all_deals():
     conn.commit()
     conn.close()
     print(f"✅ Inseridos {sucesso} de {len(all_deals)} negócios antigos com sucesso.")
-
 
 if __name__ == "__main__":
     load_all_deals()

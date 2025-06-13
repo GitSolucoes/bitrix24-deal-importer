@@ -74,5 +74,6 @@ def load_all_deals():
     conn.close()
     print(f"✅ Inseridos {len(all_deals)} negócios antigos.")
 
+
 if __name__ == "__main__":
-    load_all_deals()
+    app.run(host="0.0.0.0", port=1421)

@@ -45,6 +45,19 @@ _cache = {
     "stages": {},  # cache separado por CATEGORY_ID
 }
 
+
+def fetch_with_retry(url, params=None, retries=3, backoff_in_seconds=1):
+    for attempt in range(retries):
+        try:
+            resp = requests.get(url, params=params, timeout=10)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Erro na tentativa {attempt + 1} da url {url}: {e}")
+            if attempt == retries - 1:
+                raise
+            time.sleep(backoff_in_seconds * (2 ** attempt))
+            
 def get_operadora_map():
     try:
         resp = requests.get(

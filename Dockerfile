@@ -17,4 +17,4 @@ COPY . .
 EXPOSE 1421
 
 # Comando para rodar sua aplicação (mude conforme seu entrypoint)
-CMD ["python", "carga_antigos.py"]
+CMD ["python", "main.py"]

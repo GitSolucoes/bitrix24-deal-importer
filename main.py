@@ -6,6 +6,7 @@ from datetime import datetime
 from dateutil import parser
 from dotenv import load_dotenv
 
+print("🔄 Carregando variáveis de ambiente...")
 load_dotenv()
 
 DB_PARAMS = {
@@ -15,35 +16,13 @@ DB_PARAMS = {
     "host": os.getenv("DB_HOST"),
     "port": os.getenv("DB_PORT"),
 }
+print("✅ Variáveis de ambiente carregadas:")
+print(DB_PARAMS)
 
 WEBHOOKS = [
     "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.deal.list",
     "https://marketingsolucoes.bitrix24.com.br/rest/5332/y5q6wd4evy5o57ze/crm.deal.list",
 ]
-
-WEBHOOK_CATEGORIES = [
-    "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.dealcategory.list",
-    "https://marketingsolucoes.bitrix24.com.br/rest/5332/y5q6wd4evy5o57ze/crm.dealcategory.list",
-]
-
-WEBHOOK_STAGES = [
-    "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.dealcategory.stage.list",
-    "https://marketingsolucoes.bitrix24.com.br/rest/5332/y5q6wd4evy5o57ze/crm.dealcategory.stage.list",
-]
-
-operador_map = {
-    "132": "VERO",
-    "34652": "GIGA+",
-    "48734": "BLINK",
-    "48764": "DESKTOP",
-    "49750": "MASTER",
-    "60994": "BL FIBRA",
-    "61062": "IMPLANTAR",
-    "61156": "CDB",
-    "61158": "NIO",
-    "356": "NENHUMA OPERADORA",
-    "352": "NÃO INFORMOU ENDEREÇO",
-}
 
 PARAMS = {
     "select[]": [
@@ -57,14 +36,13 @@ PARAMS = {
     "start": 0,
 }
 
-MAX_RETRIES = 20
-RETRY_DELAY = 30
-REQUEST_DELAY = 2
 PAGE_DELAY = 30
-LIMITE_REGISTROS_TURBO = 20000
 
 def get_conn():
-    return psycopg2.connect(**DB_PARAMS)
+    print("🔌 Tentando conectar ao banco de dados...")
+    conn = psycopg2.connect(**DB_PARAMS)
+    print("✅ Conectado ao banco com sucesso.")
+    return conn
 
 def format_date(date_str):
     if not date_str:
@@ -132,3 +110,47 @@ def upsert_deal(conn, deal):
 
     except Exception as e:
         print(f"❌ Erro ao inserir/atualizar deal {deal.get('ID')}: {e}")
+
+def fetch_deals(url):
+    print(f"🌐 Requisição para {url}")
+    try:
+        response = requests.get(url, params=PARAMS)
+        print(f"📶 Status HTTP: {response.status_code}")
+        response.raise_for_status()
+        json_data = response.json()
+        result = json_data.get("result", [])
+        print(f"📥 Recebidos {len(result)} deals da URL: {url}")
+        return result
+    except Exception as e:
+        print(f"❌ Erro ao buscar deals de {url}: {e}")
+        return []
+
+def main():
+    print("\n🚀 Script iniciado em:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    conn = get_conn()
+
+    try:
+        for url in WEBHOOKS:
+            print(f"\n🔁 Processando webhook: {url}")
+            deals = fetch_deals(url)
+            print(f"🔍 {len(deals)} deals obtidos")
+
+            for deal in deals:
+                print(f"➡️ Processando deal ID: {deal.get('ID')}")
+                upsert_deal(conn, deal)
+
+            print(f"⏱️ Aguardando {PAGE_DELAY} segundos antes da próxima requisição...")
+            time.sleep(PAGE_DELAY)
+
+        conn.commit()
+        print("\n✅ Todos os dados foram processados e salvos com sucesso.")
+
+    except Exception as e:
+        print(f"❌ Erro durante execução principal: {e}")
+
+    finally:
+        conn.close()
+        print("🔒 Conexão com banco encerrada.")
+
+if __name__ == "__main__":
+    main()

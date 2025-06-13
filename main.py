@@ -69,21 +69,50 @@ def upsert_deal(conn, deal):
         with conn.cursor() as cur:
             print(f"\n📝 Inserindo/atualizando deal ID: {deal.get('ID')}")
 
+            date_create = format_date(deal.get("DATE_CREATE"))
+            telefone = deal.get("UF_CRM_1698698407472")
+            operadoras = deal.get("UF_CRM_1699452141037")
+
+            # Trata campo de operadoras (listas ou dicionário vazio)
+            if isinstance(operadoras, dict) and not operadoras:
+                operadoras = None
+            elif isinstance(operadoras, list):
+                operadoras = "{" + ",".join(map(str, operadoras)) + "}"
+            elif operadoras is None:
+                operadoras = None
+            else:
+                operadoras = str(operadoras)
+
             dados = (
-                deal.get("ID"), deal.get("TITLE"), deal.get("STAGE_ID"), deal.get("CATEGORY_ID"),
-                deal.get("UF_CRM_1700661314351"), deal.get("CONTACT_ID"), deal.get("DATE_CREATE"),
-                deal.get("UF_CRM_1698698407472"), deal.get("UF_CRM_1698698858832"),
-                deal.get("UF_CRM_1697653896576"), deal.get("UF_CRM_1697762313423"),
-                deal.get("UF_CRM_1697763267151"), deal.get("UF_CRM_1697764091406"),
-                deal.get("UF_CRM_1697807340141"), deal.get("UF_CRM_1697807353336"),
-                deal.get("UF_CRM_1697807372536"), deal.get("UF_CRM_1697808018193"),
-                deal.get("UF_CRM_1698688252221"), deal.get("UF_CRM_1698761151613"),
-                deal.get("UF_CRM_1699452141037"), deal.get("UF_CRM_1700661287551"),
-                deal.get("UF_CRM_1731588487"), deal.get("UF_CRM_1700661252544"), deal.get("UF_CRM_1731589190")
+                deal.get("ID"),
+                deal.get("TITLE"),
+                deal.get("STAGE_ID"),
+                deal.get("CATEGORY_ID"),
+                deal.get("UF_CRM_1700661314351"),
+                deal.get("CONTACT_ID"),
+                date_create,
+                telefone,
+                deal.get("UF_CRM_1698698858832"),
+                deal.get("UF_CRM_1697653896576"),
+                deal.get("UF_CRM_1697762313423"),
+                deal.get("UF_CRM_1697763267151"),
+                deal.get("UF_CRM_1697764091406"),
+                deal.get("UF_CRM_1697807340141"),
+                deal.get("UF_CRM_1697807353336"),
+                deal.get("UF_CRM_1697807372536"),
+                deal.get("UF_CRM_1697808018193"),
+                deal.get("UF_CRM_1698688252221"),
+                deal.get("UF_CRM_1698761151613"),
+                operadoras,
+                deal.get("UF_CRM_1700661287551"),
+                deal.get("UF_CRM_1731588487"),
+                deal.get("UF_CRM_1700661252544"),
+                deal.get("UF_CRM_1731589190")
             )
 
-            print("📌 Dados que serão inseridos no banco:")
+            print("📌 Dados formatados que serão inseridos no banco:")
             print(dados)
+
 
             cur.execute("""
                 INSERT INTO deals (

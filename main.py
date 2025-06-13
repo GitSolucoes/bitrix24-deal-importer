@@ -38,13 +38,12 @@ PARAMS = {
 }
 
 PAGE_DELAY = 10
-_CACHE_TTL = 3600  # tempo de vida do cache em segundos (1 hora)
+_CACHE_TTL = 3600
 
 _cache = {
     "categories": {"data": {}, "timestamp": 0},
-    "stages": {},  # cache separado por CATEGORY_ID
+    "stages": {},
 }
-
 
 def fetch_with_retry(url, params=None, retries=3, backoff_in_seconds=1):
     for attempt in range(retries):
@@ -57,7 +56,7 @@ def fetch_with_retry(url, params=None, retries=3, backoff_in_seconds=1):
             if attempt == retries - 1:
                 raise
             time.sleep(backoff_in_seconds * (2 ** attempt))
-            
+
 def get_operadora_map():
     try:
         resp = requests.get(
@@ -70,8 +69,6 @@ def get_operadora_map():
         print("❌ Erro ao buscar operadoras:", e)
         return {}
 
-
-
 def get_conn():
     return psycopg2.connect(**DB_PARAMS)
 
@@ -81,8 +78,6 @@ def format_date(date_str):
     dt = parser.isoparse(date_str)
     dt_naive = dt.replace(tzinfo=None)
     return dt_naive.strftime("%d/%m/%Y")
-
-
 
 def get_stages(cat_id):
     now = time.time()
@@ -99,7 +94,6 @@ def get_stages(cat_id):
             stages[stage["STATUS_ID"]] = stage["NAME"]
     _cache["stages"][cat_id] = {"data": stages, "timestamp": now}
     return stages
-    
 
 def get_categories():
     now = time.time()
@@ -115,7 +109,6 @@ def get_categories():
     _cache["categories"]["data"] = categories
     _cache["categories"]["timestamp"] = now
     return categories
-
 
 def upsert_deal(conn, deal):
     with conn.cursor() as cur:
@@ -159,29 +152,28 @@ def upsert_deal(conn, deal):
                 deal.get("TITLE"),
                 deal.get("STAGE_ID"),
                 deal.get("CATEGORY_ID"),
-                deal.get("UF_CRM_1700661314351"),  # uf_crm_cep
-                deal.get("CONTACT_ID"),  # uf_crm_contato
+                deal.get("UF_CRM_1700661314351"),
+                deal.get("CONTACT_ID"),
                 deal.get("DATE_CREATE"),
-                deal.get("UF_CRM_1698698407472"),  # contato01
-                deal.get("UF_CRM_1698698858832"),  # contato02
-                deal.get("UF_CRM_1697653896576"),  # ordem de serviço
-                deal.get("UF_CRM_1697762313423"),  # nome do cliente
-                deal.get("UF_CRM_1697763267151"),  # nome da mãe
-                deal.get("UF_CRM_1697764091406"),  # vencimento
-                deal.get("UF_CRM_1697807340141"),  # email
-                deal.get("UF_CRM_1697807353336"),  # cpf
-                deal.get("UF_CRM_1697807372536"),  # rg
-                deal.get("UF_CRM_1697808018193"),  # referencia
-                deal.get("UF_CRM_1698688252221"),  # rua
-                deal.get("UF_CRM_1698761151613"),  # data de instalação
-                deal.get("UF_CRM_1699452141037"),  # operadoras viáveis
-                deal.get("UF_CRM_1700661287551"),  # bairro
-                deal.get("UF_CRM_1731588487"),     # cidade
-                deal.get("UF_CRM_1700661252544"),  # número
-                deal.get("UF_CRM_1731589190"),     # uf
+                deal.get("UF_CRM_1698698407472"),
+                deal.get("UF_CRM_1698698858832"),
+                deal.get("UF_CRM_1697653896576"),
+                deal.get("UF_CRM_1697762313423"),
+                deal.get("UF_CRM_1697763267151"),
+                deal.get("UF_CRM_1697764091406"),
+                deal.get("UF_CRM_1697807340141"),
+                deal.get("UF_CRM_1697807353336"),
+                deal.get("UF_CRM_1697807372536"),
+                deal.get("UF_CRM_1697808018193"),
+                deal.get("UF_CRM_1698688252221"),
+                deal.get("UF_CRM_1698761151613"),
+                deal.get("UF_CRM_1699452141037"),
+                deal.get("UF_CRM_1700661287551"),
+                deal.get("UF_CRM_1731588487"),
+                deal.get("UF_CRM_1700661252544"),
+                deal.get("UF_CRM_1731589190"),
             ),
         )
-
 
 def fetch_all_deals(url):
     start = 0
@@ -206,7 +198,6 @@ def fetch_all_deals(url):
 
     return all_deals
 
-
 def main():
     print("\n🚀 Script iniciado em:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     conn = get_conn()
@@ -225,7 +216,6 @@ def main():
                 deal_id = deal.get('ID')
                 print(f"➡️ Processando deal ID: {deal_id}")
 
-                # Adiciona nomes legíveis de categoria e estágio (para debug ou expansão futura)
                 cat_id = deal.get("CATEGORY_ID")
                 stage_id = deal.get("STAGE_ID")
 
@@ -253,8 +243,10 @@ def main():
 if __name__ == "__main__":
     main()
 
+# 🔎 Teste com fake_deal após o main
+print("🧪 Teste final: inserindo deal fake manualmente...")
 
-print("🧪 Teste final: buscando 1 deal manualmente para ver se insere")
+conn = get_conn()
 
 fake_deal = {
     "ID": 999999,
@@ -283,5 +275,12 @@ fake_deal = {
     "UF_CRM_1731589190": "SP",
 }
 
-upsert_deal(conn, fake_deal)
-conn.commit()
+try:
+    upsert_deal(conn, fake_deal)
+    conn.commit()
+    print("✅ Deal fake inserido com sucesso!")
+except Exception as e:
+    print("❌ Erro ao inserir deal fake:", e)
+finally:
+    conn.close()
+    print("🔒 Conexão encerrada após teste.")

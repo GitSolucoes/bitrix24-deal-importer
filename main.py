@@ -16,21 +16,15 @@ _CACHE_TTL = 3600  # 1 hora
 # 🔎 Data mínima para importar (formato YYYY-MM-DD)
 DATA_INICIAL = "2025-01-01"
 
-def fetch_with_retry(url, params=None, retries=5, backoff=3):
+def fetch_with_retry(url, params=None, retries=3, backoff=1):
     for attempt in range(retries):
         try:
             resp = requests.get(url, params=params, timeout=15)
-            if resp.status_code == 429:
-                # Respeita o tempo de espera indicado no cabeçalho (se houver)
-                retry_after = int(resp.headers.get("Retry-After", "10"))
-                print(f"⏳ Limite de requisições atingido. Aguardando {retry_after}s antes de tentar novamente...")
-                time.sleep(retry_after)
-                continue
             resp.raise_for_status()
             return resp.json()
-        except requests.exceptions.HTTPError as e:
+        except Exception as e:
             print(f"❌ Erro {attempt+1}/{retries} ao buscar {url}: {e}")
-            time.sleep(backoff * (2 ** attempt))  # Exponencial
+            time.sleep(backoff * (2 ** attempt))
     raise Exception("Erro após múltiplas tentativas")
 
 def get_categories():
@@ -78,7 +72,6 @@ def process_deal(deal, categorias, estagios_por_categoria, operadora_map):
 
     return deal
 
-
 def main():
     print(f"🔁 Iniciando leitura paginada dos deals desde {DATA_INICIAL}...")
     start = 0
@@ -120,7 +113,6 @@ def main():
         if "next" not in data:
             break
         start = data["next"]
-        time.sleep(1) 
 
     conn.commit()
     conn.close()

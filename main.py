@@ -18,13 +18,13 @@ def load_all_deals():
 
     while True:
         try:
-            print(f"📨 Fazendo requisição com start={start}") 
+            print(f"📨 Fazendo requisição com start={start}")
             response = requests.post(url, json={
                 "start": start,
                 "order": {"ID": "ASC"},
                 "filter": {">=DATE_CREATE": "2024-02-09T00:00:00Z"},
                 "select": ["*"]
-            }, timeout=300)
+            }, timeout=30)
             response.raise_for_status()
             data = response.json()
             result = data.get("result", [])
@@ -37,8 +37,17 @@ def load_all_deals():
 
             if not start:
                 break
-            time.sleep(1.5)
 
+            time.sleep(2)  # pausa maior para evitar 429
+
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                print("⏳ Limite de requisições atingido. Aguardando 60 segundos...")
+                time.sleep(60)  # espera para liberar o limite
+                continue  # tenta de novo
+            else:
+                print(f"❌ Erro durante paginação: {e}")
+                break
         except Exception as e:
             print(f"❌ Erro durante paginação: {e}")
             break

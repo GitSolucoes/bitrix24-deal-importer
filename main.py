@@ -36,7 +36,7 @@ PARAMS = {
     "start": 0,
 }
 
-PAGE_DELAY =10
+PAGE_DELAY = 10
 
 def get_conn():
     print("🔌 Tentando conectar ao banco de dados...")

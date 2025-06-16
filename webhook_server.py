@@ -2,24 +2,34 @@ from flask import Flask, request, jsonify
 from atualizar_cache import get_conn, upsert_deal, format_date, get_categories, get_stages, get_operadora_map
 import requests
 import os
-import time  # <-- IMPORTANTE para o sleep
+import time 
 
 app = Flask(__name__)
 
-# Seu webhook de leitura (GET único)
+
 BITRIX_WEBHOOK = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.deal.get"
 
-def get_stages_with_retry(cat_id, max_retries=5, wait_seconds=5):
+def get_stages_with_retry(cat_id, max_retries=5, base_wait=2):
     for attempt in range(1, max_retries + 1):
         try:
             stages = get_stages(cat_id)
             return stages
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 503:
+                wait_time = base_wait * (2 ** (attempt - 1))  # backoff exponencial
+                print(f"⚠️ 503 Serviço indisponível para categoria {cat_id}. Tentativa {attempt}/{max_retries}, aguardando {wait_time}s...")
+                if attempt == max_retries:
+                    print(f"❌ Falha definitiva na categoria {cat_id} após {max_retries} tentativas.")
+                    return {}
+                time.sleep(wait_time)
+            else:
+                print(f"❌ Erro HTTP inesperado: {e}")
+                raise
         except Exception as e:
-            print(f"⚠️ Erro ao buscar estágios para categoria {cat_id}, tentativa {attempt} de {max_retries}: {e}")
-            if attempt == max_retries:
-                print(f"❌ Falha definitiva ao buscar estágios para categoria {cat_id}")
-                return {}  # ou raise, se quiser abortar completamente
-            time.sleep(wait_seconds)
+            print(f"❌ Erro ao buscar estágios para categoria {cat_id}: {e}")
+            return {}
+
+
 
 @app.route("/bitrix-webhook", methods=["POST"])
 def bitrix_webhook():

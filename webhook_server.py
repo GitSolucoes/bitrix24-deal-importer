@@ -16,7 +16,7 @@ def get_stages_with_retry(cat_id, max_retries=5, base_wait=2):
             return stages
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 503:
-                wait_time = base_wait * (2 ** (attempt - 1))  # backoff exponencial
+                wait_time = base_wait * (20 ** (attempt - 1))  # backoff exponencial
                 print(f"⚠️ 503 Serviço indisponível para categoria {cat_id}. Tentativa {attempt}/{max_retries}, aguardando {wait_time}s...")
                 if attempt == max_retries:
                     print(f"❌ Falha definitiva na categoria {cat_id} após {max_retries} tentativas.")

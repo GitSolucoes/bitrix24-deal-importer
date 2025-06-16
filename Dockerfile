@@ -15,4 +15,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Expor a porta
 EXPOSE 1321
 
-CMD ["python", "main.py"]
+CMD ["python", "webhook_server.py"]

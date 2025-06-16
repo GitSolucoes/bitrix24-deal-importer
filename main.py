@@ -1,212 +1,259 @@
-from flask import Flask, request, jsonify
-from atualizar_cache import get_conn, upsert_deal, format_date, get_operadora_map
+from fastapi import FastAPI, Request, Form, UploadFile, File
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    StreamingResponse,
+    FileResponse,
+)
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+import io
+import pandas as pd
+import psycopg2
+import os
+import tempfile
+from dotenv import load_dotenv
 import requests
-import time
 
-app = Flask(__name__)
+load_dotenv()
 
-# Seu webhook de leitura (GET único)
-BITRIX_WEBHOOK = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.deal.get"
+app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+BITRIX_API_BASE = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5"
 
-# Cache simples para categorias e estágios
-_cache = {
-    "categories": {"data": None, "timestamp": 0},
-    "stages": {},  # stages cache por categoria: {cat_id: {"data": ..., "timestamp": ...}}
-}
-_CACHE_TTL = 3600  # 1 hora
 
-def fetch_with_retry(url, params=None, retries=3, backoff_in_seconds=1):
-    for attempt in range(retries):
-        try:
-            resp = requests.get(url, params=params, timeout=10)
-            resp.raise_for_status()
-            return resp.json()
-        except requests.exceptions.RequestException as e:
-            print(f"❌ Erro na tentativa {attempt + 1} da url {url}: {e}")
-            if attempt == retries - 1:
-                raise
-            time.sleep(backoff_in_seconds * (2 ** attempt))
+def get_conn():
+    return psycopg2.connect(
+        dbname=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT"),
+    )
+
 
 def get_categories():
-    now = time.time()
-    if _cache["categories"]["data"] and now - _cache["categories"]["timestamp"] < _CACHE_TTL:
-        return _cache["categories"]["data"]
-
-    url = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.dealcategory.list"
-    data = fetch_with_retry(url)
-    categories = {}
-    if "result" in data:
-        for cat in data["result"]:
-            categories[cat["ID"]] = cat["NAME"]
-    _cache["categories"]["data"] = categories
-    _cache["categories"]["timestamp"] = now
-    return categories
-
-def get_stages(cat_id):
-    now = time.time()
-    if cat_id in _cache["stages"]:
-        if now - _cache["stages"][cat_id]["timestamp"] < _CACHE_TTL:
-            return _cache["stages"][cat_id]["data"]
-
-    url = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.dealcategory.stage.list"
-    params = {"id": cat_id, "start": 0}
-    data = fetch_with_retry(url, params=params)
-    stages = {}
-    if "result" in data:
-        for stage in data["result"]:
-            stages[stage["STATUS_ID"]] = stage["NAME"]
-    _cache["stages"][cat_id] = {"data": stages, "timestamp": now}
-    return stages
-
-
-@app.route("/bitrix-webhook", methods=["POST"])
-def bitrix_webhook():
-    print("🔔 Webhook recebido")
-
     try:
-        form_data = request.form.to_dict(flat=False)
-        print("📦 Form recebido:", form_data)
-
-        deal_id = form_data.get("data[FIELDS][ID]", [None])[0]
-        if not deal_id:
-            return jsonify({"error": "ID do negócio não encontrado"}), 400
-
-        resp = requests.get(BITRIX_WEBHOOK, params={"id": deal_id}, timeout=20)
+        resp = requests.get(
+            f"{BITRIX_API_BASE}/crm.category.list", params={"entityTypeId": 2}
+        )
         data = resp.json()
-        if "result" not in data:
-            return jsonify({"error": "Resposta inválida do Bitrix"}), 502
-
-        deal = data["result"]
-
-        # Converte datas
-        if "DATE_CREATE" in deal:
-            deal["DATE_CREATE"] = format_date(deal["DATE_CREATE"])
-        if "UF_CRM_1698761151613" in deal:
-            deal["UF_CRM_1698761151613"] = format_date(deal["UF_CRM_1698761151613"])
-
-        # Pega mapas para converter IDs para nomes (cache e retry aplicados aqui)
-        categorias = get_categories()
-        estagios_por_categoria = {cat_id: get_stages(cat_id) for cat_id in categorias.keys()}
-        operadora_map = get_operadora_map()
-
-        # Converte categoria e estágio para nome
-        cat_id = deal.get("CATEGORY_ID")
-        stage_id = deal.get("STAGE_ID")
-        if cat_id in categorias:
-            deal["CATEGORY_ID"] = categorias[cat_id]
-        if cat_id in estagios_por_categoria and stage_id in estagios_por_categoria[cat_id]:
-            deal["STAGE_ID"] = estagios_por_categoria[cat_id][stage_id]
-
-        # Converte lista de IDs de operadoras para nomes string
-        ids = deal.get("UF_CRM_1699452141037", [])
-        if not isinstance(ids, list):
-            ids = []
-        nomes = [operadora_map.get(str(i)) for i in ids if str(i) in operadora_map]
-        nomes_filtrados = [n for n in nomes if isinstance(n, str) and n.strip()]
-        deal["UF_CRM_1699452141037"] = ", ".join(nomes_filtrados) if nomes_filtrados else ""
-
-        # Upsert no banco
-        conn = get_conn()
-        upsert_deal(conn, deal)
-        conn.commit()
-        conn.close()
-
-        print(f"✅ Deal {deal_id} atualizado com sucesso")
-        return jsonify({"status": "ok", "deal_id": deal_id}), 200
-
-    except Exception as e:
-        print(f"❌ Erro ao processar webhook: {e}")
-        return jsonify({"error": str(e)}), 500
+        return {
+            cat["id"]: cat["name"]
+            for cat in data.get("result", {}).get("categories", [])
+        }
+    except:
+        return {}
 
 
-def load_all_deals():
-    print("🔁 Iniciando carga completa de negócios...")
-
-    all_deals = []
-    start = 0
-    url = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.deal.list"
-
-    while True:
-        try:
-            response = requests.post(url, json={
-                "start": start,
-                "order": {"ID": "ASC"},
-                "select": ["*"]
-            }, timeout=300)
-
-            response.raise_for_status()
-            data = response.json()
-
-            result = data.get("result", [])
-            ids = [deal.get("ID") for deal in result]
-            print(f"📋 IDs recebidos neste lote: {ids}")
-
-            all_deals.extend(result)
-            print(f"📦 Total acumulado: {len(all_deals)} negócios")
-
-            if "next" not in data:
-                break
-
-            start = data["next"]
-            time.sleep(100)  # tempo padrão entre chamadas
-
-        except HTTPError as http_err:
-            if response.status_code == 429:
-                print("⏳ Limite de requisições excedido (429). Aguardando 2 minutos antes de tentar novamente...")
-                time.sleep(160)  # espera 2 minutos
-                continue  # tenta de novo o mesmo start
-            else:
-                print(f"❌ Erro HTTP inesperado: {http_err}")
-                break
-        except Exception as e:
-            print(f"❌ Erro durante paginação: {e}")
-            break
-
-    if not all_deals:
-        print("⚠️ Nenhum negócio encontrado.")
-        return
+def get_stages(category_id):
+    try:
+        resp = requests.get(
+            f"{BITRIX_API_BASE}/crm.dealcategory.stage.list", params={"id": category_id}
+        )
+        data = resp.json()
+        return {stage["STATUS_ID"]: stage["NAME"] for stage in data.get("result", [])}
+    except:
+        return {}
 
 
-    # Reaproveita lógica do webhook
+def buscar_por_cep(cep):
+    cep_limpo = cep.replace("-", "").strip()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT "id", "title", "stage_id", "category_id", "uf_crm_cep", "uf_crm_contato", "date_create", "contato01", "contato02", "ordem_de_servico", "nome_do_cliente",
+            "nome_da_mae", "data_de_vencimento", "email", "cpf", "rg", "referencia", "rua", "data_de_instalacao", "quais_operadoras_tem_viabilidade"
+                FROM deals
+                WHERE replace("uf_crm_cep", '-', '') = %s;
+            """,
+                (cep_limpo,),
+            )
+            rows = cur.fetchall()
+
+    # Carrega categorias e inicializa cache stages
     categorias = get_categories()
-    estagios_por_categoria = {cat_id: get_stages(cat_id) for cat_id in categorias.keys()}
-    operadora_map = get_operadora_map()
+    stages_cache = {}
 
-    conn = get_conn()
-    for deal in all_deals:
-        try:
-            if "DATE_CREATE" in deal:
-                deal["DATE_CREATE"] = format_date(deal["DATE_CREATE"])
-            if "UF_CRM_1698761151613" in deal:
-                deal["UF_CRM_1698761151613"] = format_date(deal["UF_CRM_1698761151613"])
+    resultados = []
+    for r in rows:
+        cat_id = r[3]
+        categoria_nome = categorias.get(cat_id, str(cat_id))
 
-            cat_id = deal.get("CATEGORY_ID")
-            stage_id = deal.get("STAGE_ID")
-            if cat_id in categorias:
-                deal["CATEGORY_ID"] = categorias[cat_id]
-            if cat_id in estagios_por_categoria and stage_id in estagios_por_categoria[cat_id]:
-                deal["STAGE_ID"] = estagios_por_categoria[cat_id][stage_id]
+        # Carrega estágios da categoria (cache)
+        if cat_id not in stages_cache:
+            stages_cache[cat_id] = get_stages(cat_id)
+        fase_nome = stages_cache[cat_id].get(r[2], r[2])  # r[2] é stage_id
 
-            ids = deal.get("UF_CRM_1699452141037", [])
-            if not isinstance(ids, list):
-                ids = []
-            nomes = [operadora_map.get(str(i)) for i in ids if str(i) in operadora_map]
-            nomes_filtrados = [n for n in nomes if isinstance(n, str) and n.strip()]
-            deal["UF_CRM_1699452141037"] = ", ".join(nomes_filtrados) if nomes_filtrados else ""
+        resultados.append(
+            {
+                "id": r[0],
+                "cliente": r[1],
+                "fase": fase_nome,
+                "categoria": categoria_nome,
+                "cep": r[4],
+                "contato": r[5],
+                "criado_em": (
+                    r[6].isoformat() if hasattr(r[6], "isoformat") else str(r[6])
+                ),
+                "contato01": r[8],
+                "contato02": r[9],
+                "ordem_de_servico": r[10],
+                "nome_do_cliente": r[11],
+                "nome_da_mae": r[12],
+                "data_de_vencimento": r[13],
+                "email": r[14],
+                "cpf": r[15],
+                "rg": r[16],
+                "referencia": r[17],
+                "rua": r[18],
+                "data_de_instalacao": r[19],
+                "quais_operadoras_tem_viabilidade": r[20],
+            }
+        )
+    return resultados
 
-            upsert_deal(conn, deal)
 
-        except Exception as e:
-            print(f"⚠️ Erro ao processar deal {deal.get('ID')}: {e}")
+def buscar_varios_ceps(lista_ceps):
+    ceps_limpos = [c.replace("-", "").strip() for c in lista_ceps if c.strip()]
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT "id", "title", "stage_id", "category_id", "uf_crm_cep", "uf_crm_contato", "date_create", "contato01", "contato02", "ordem_de_servico", "nome_do_cliente",
+            "nome_da_mae", "data_de_vencimento", "email", "cpf", "rg", "referencia", "rua", "data_de_instalacao", "quais_operadoras_tem_viabilidade"
+                FROM deals
+                WHERE replace("uf_crm_cep", '-', '') = ANY(%s);
+            """,
+                (ceps_limpos),
+            )
+            rows = cur.fetchall()
 
-    conn.commit()
-    conn.close()
-    print(f"✅ Inseridos {len(all_deals)} negócios no banco de dados.")
+    categorias = get_categories()
+    stages_cache = {}
+
+    resultados = []
+    for r in rows:
+        cat_id = r[3]
+        categoria_nome = categorias.get(cat_id, str(cat_id))
+
+        if cat_id not in stages_cache:
+            stages_cache[cat_id] = get_stages(cat_id)
+        fase_nome = stages_cache[cat_id].get(r[2], r[2])
+
+        resultados.append(
+            {
+                "id": r[0],
+                "cliente": r[1],
+                "fase": fase_nome,
+                "categoria": categoria_nome,
+                "uf_crm_cep": r[4],
+                "contato": r[5],
+                "criado_em": (
+                    r[6].isoformat() if hasattr(r[6], "isoformat") else str(r[6])
+                ),
+                "contato01": r[8],
+                "contato02": r[9],
+                "ordem_de_servico": r[10],
+                "nome_do_cliente": r[11],
+                "nome_da_mae": r[12],
+                "data_de_vencimento": r[13],
+                "email": r[14],
+                "cpf": r[15],
+                "rg": r[16],
+                "referencia": r[17],
+                "rua": r[18],
+                "data_de_instalacao": r[19],
+                "quais_operadoras_tem_viabilidade": r[20],
+            }
+        )
+    return resultados
 
 
-if __name__ == "__main__":
-    # Carregar todos os deals uma única vez ao iniciar
-    load_all_deals()
+async def extrair_ceps_arquivo(arquivo: UploadFile):
+    nome = arquivo.filename.lower()
+    conteudo = await arquivo.read()
+    ceps = []
 
-    # Iniciar o servidor Flask
-    app.run(host="0.0.0.0", port=1321)
+    if nome.endswith(".txt"):
+        ceps = conteudo.decode().splitlines()
+    elif nome.endswith(".csv"):
+        df = pd.read_csv(io.BytesIO(conteudo))
+        for col in df.columns:
+            if "cep" in col.lower():
+                ceps = df[col].astype(str).tolist()
+                break
+    elif nome.endswith(".xlsx"):
+        df = pd.read_excel(io.BytesIO(conteudo))
+        for col in df.columns:
+            if "cep" in col.lower():
+                ceps = df[col].astype(str).tolist()
+                break
+    return ceps
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.post("/buscar")
+async def buscar(
+    cep: str = Form(None), arquivo: UploadFile = File(None), formato: str = Form("txt")
+):
+    if cep and (arquivo and arquivo.filename != ""):
+        return JSONResponse(
+            content={"error": "Envie apenas um CEP ou um arquivo, não ambos."},
+            status_code=400,
+        )
+
+    if arquivo and arquivo.filename != "":
+        ceps = await extrair_ceps_arquivo(arquivo)
+        if not ceps:
+            return JSONResponse(
+                content={"error": "Nenhum CEP encontrado no arquivo."}, status_code=400
+            )
+
+        resultados = buscar_varios_ceps(ceps)
+        if not resultados:
+            resultados = []
+
+        if formato == "xlsx":
+            df = pd.DataFrame(resultados)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+                df.to_excel(tmp.name, index=False)
+                tmp.seek(0)
+                return FileResponse(
+                    tmp.name,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    filename="resultado.xlsx",
+                )
+        else:
+            output = io.StringIO()
+            for res in resultados:
+                output.write(
+                    f"ID: {res['id']} | Cliente: {res['cliente']} | Fase: {res['fase']} | Categoria: {res['categoria']} | CEP: {res['uf_crm_cep']} | Contato: {res['contato']} | \
+                          Criado em: {res['criado_em']} | Contato 01: {res['contato01']} | Contato 02: {res['contato02']} | Ordem de Serviço: {res['ordem_de_servico']} \
+                             | Nome do Cliente: {res['nome_do_cliente']} | Nome da Mãe: {res['nome_da_mae']} | Data de Vencimento: {res['data_de_vencimento']} | Email: {res['email']} \
+                                 | CPF: {res['cpf']} | RG: {res['rg']} | Referência: {res['referencia']} | Rua: {res['rua']} | Data de Instalação: {res['data_de_instalacao']} | Quais operadoras tem viabilidade: {res['quais_operadoras_tem_viabilidade']} \n"
+                )
+            output.seek(0)
+
+            headers = {"Content-Disposition": 'attachment; filename="resultado.txt"'}
+
+            return StreamingResponse(output, media_type="text/plain", headers=headers)
+
+    elif cep:
+        resultados = buscar_por_cep(cep)
+        if not resultados:
+            resultados = []
+        return JSONResponse(
+            content={"total": len(resultados), "resultados": resultados}
+        )
+
+    else:
+        return JSONResponse(
+            content={"error": "Nenhum CEP ou arquivo enviado."}, status_code=400
+        )

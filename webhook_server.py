@@ -1,22 +1,27 @@
 from flask import Flask, request, jsonify
 from atualizar_cache import get_conn, upsert_deal, format_date, get_categories, get_stages, get_operadora_map
 import requests
-import os
-import time 
+import time
 
 app = Flask(__name__)
 
-
 BITRIX_WEBHOOK = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.deal.get"
 
+# Cache simples para estágios em memória
+stage_cache = {}
+
 def get_stages_with_retry(cat_id, max_retries=5, base_wait=2):
+    if cat_id in stage_cache:
+        return stage_cache[cat_id]
+
     for attempt in range(1, max_retries + 1):
         try:
             stages = get_stages(cat_id)
+            stage_cache[cat_id] = stages
             return stages
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 503:
-                wait_time = base_wait * (20 ** (attempt - 1))  # backoff exponencial
+                wait_time = base_wait * (2 ** (attempt - 1))
                 print(f"⚠️ 503 Serviço indisponível para categoria {cat_id}. Tentativa {attempt}/{max_retries}, aguardando {wait_time}s...")
                 if attempt == max_retries:
                     print(f"❌ Falha definitiva na categoria {cat_id} após {max_retries} tentativas.")
@@ -28,8 +33,6 @@ def get_stages_with_retry(cat_id, max_retries=5, base_wait=2):
         except Exception as e:
             print(f"❌ Erro ao buscar estágios para categoria {cat_id}: {e}")
             return {}
-
-
 
 @app.route("/bitrix-webhook", methods=["POST"])
 def bitrix_webhook():
@@ -56,16 +59,20 @@ def bitrix_webhook():
         if "UF_CRM_1698761151613" in deal:
             deal["UF_CRM_1698761151613"] = format_date(deal["UF_CRM_1698761151613"])
 
-        # Pega mapas para converter IDs para nomes (igual no batch)
+        # Pega mapa categorias e operadoras
         categorias = get_categories()
-        estagios_por_categoria = {cat_id: get_stages_with_retry(cat_id) for cat_id in categorias.keys()}
         operadora_map = get_operadora_map()
 
-        # Converte categoria e estágio para nome
+        # Pega a categoria do negócio e busca os estágios só para ela
         cat_id = deal.get("CATEGORY_ID")
-        stage_id = deal.get("STAGE_ID")
+        estagios_por_categoria = {}
+        if cat_id in categorias:
+            estagios_por_categoria[cat_id] = get_stages_with_retry(cat_id)
+
+        # Converte categoria e estágio para nome
         if cat_id in categorias:
             deal["CATEGORY_ID"] = categorias[cat_id]
+        stage_id = deal.get("STAGE_ID")
         if cat_id in estagios_por_categoria and stage_id in estagios_por_categoria[cat_id]:
             deal["STAGE_ID"] = estagios_por_categoria[cat_id][stage_id]
 

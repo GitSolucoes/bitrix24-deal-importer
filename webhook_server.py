@@ -2,11 +2,24 @@ from flask import Flask, request, jsonify
 from atualizar_cache import get_conn, upsert_deal, format_date, get_categories, get_stages, get_operadora_map
 import requests
 import os
+import time  # <-- IMPORTANTE para o sleep
 
 app = Flask(__name__)
 
 # Seu webhook de leitura (GET único)
 BITRIX_WEBHOOK = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5/crm.deal.get"
+
+def get_stages_with_retry(cat_id, max_retries=5, wait_seconds=5):
+    for attempt in range(1, max_retries + 1):
+        try:
+            stages = get_stages(cat_id)
+            return stages
+        except Exception as e:
+            print(f"⚠️ Erro ao buscar estágios para categoria {cat_id}, tentativa {attempt} de {max_retries}: {e}")
+            if attempt == max_retries:
+                print(f"❌ Falha definitiva ao buscar estágios para categoria {cat_id}")
+                return {}  # ou raise, se quiser abortar completamente
+            time.sleep(wait_seconds)
 
 @app.route("/bitrix-webhook", methods=["POST"])
 def bitrix_webhook():
@@ -35,7 +48,7 @@ def bitrix_webhook():
 
         # Pega mapas para converter IDs para nomes (igual no batch)
         categorias = get_categories()
-        estagios_por_categoria = {cat_id: get_stages(cat_id) for cat_id in categorias.keys()}
+        estagios_por_categoria = {cat_id: get_stages_with_retry(cat_id) for cat_id in categorias.keys()}
         operadora_map = get_operadora_map()
 
         # Converte categoria e estágio para nome
@@ -66,7 +79,6 @@ def bitrix_webhook():
     except Exception as e:
         print(f"❌ Erro ao processar webhook: {e}")
         return jsonify({"error": str(e)}), 500
-
 
 
 if __name__ == "__main__":

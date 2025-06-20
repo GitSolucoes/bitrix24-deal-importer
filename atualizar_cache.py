@@ -111,7 +111,7 @@ def upsert_deal(conn, deal):
                 contato01, contato02, ordem_de_servico, nome_do_cliente, nome_da_mae,
                 data_de_vencimento, email, cpf, rg, referencia, rua, data_de_instalacao,
                 quais_operadoras_tem_viabilidade,
-                uf_crm_bairro, uf_crm_cidade, uf_crm_numero, uf_crm_uf, responsavel_pela_venda
+                uf_crm_bairro, uf_crm_cidade, uf_crm_numero, uf_crm_uf, respoonsavel_pela_venda
             )
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO UPDATE SET
@@ -138,7 +138,7 @@ def upsert_deal(conn, deal):
                 uf_crm_cidade = EXCLUDED.uf_crm_cidade,
                 uf_crm_numero = EXCLUDED.uf_crm_numero,
                 uf_crm_uf = EXCLUDED.uf_crm_uf;
-                responsavel_pela_venda = EXCLUDED.responsavel_pela_venda;
+                respoonsavel_pela_venda = EXCLUDED.respoonsavel_pela_venda;
             """,
             (
                 deal.get("ID"),

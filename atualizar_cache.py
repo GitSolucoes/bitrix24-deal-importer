@@ -59,6 +59,7 @@ PARAMS = {
         "UF_CRM_1698688252221",  # Rua
         "UF_CRM_1698761151613",  # Data de instalação
         "UF_CRM_1699452141037",  # Quais operadoras tem viabilidade?
+        "UF_CRM_1699475211222", # Consultor responsavel pela venda
         "DATE_CREATE",
     ],
     "filter[>=DATE_CREATE]": "2021-01-01",
@@ -82,6 +83,23 @@ def format_date(date_str):
     dt_naive = dt.replace(tzinfo=None)
     return dt_naive.strftime("%d/%m/%Y")
 
+def get_responsible_name (id) :
+    base_url = "https://marketingsolucoes.bitrix24.com.br/rest/5332/8zyo7yj1ry4k59b5"
+    res = requests.get(f"{base_url}/crm.deal.fields")
+    data = res.json()["result"]
+    responsibles:dict = data["UF_CRM_1699475211222"]["items"]
+
+    responsible_name = None
+
+    for responsible in responsibles :
+        if responsible["ID"] == id :
+            responsible_name = responsible["VALUE"]
+            break
+
+    return responsible_name
+
+
+
 
 
 def upsert_deal(conn, deal):
@@ -93,9 +111,9 @@ def upsert_deal(conn, deal):
                 contato01, contato02, ordem_de_servico, nome_do_cliente, nome_da_mae,
                 data_de_vencimento, email, cpf, rg, referencia, rua, data_de_instalacao,
                 quais_operadoras_tem_viabilidade,
-                uf_crm_bairro, uf_crm_cidade, uf_crm_numero, uf_crm_uf
+                uf_crm_bairro, uf_crm_cidade, uf_crm_numero, uf_crm_uf, responsavel_pela_venda
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO UPDATE SET
                 title = EXCLUDED.title,
                 stage_id = EXCLUDED.stage_id,
@@ -120,6 +138,7 @@ def upsert_deal(conn, deal):
                 uf_crm_cidade = EXCLUDED.uf_crm_cidade,
                 uf_crm_numero = EXCLUDED.uf_crm_numero,
                 uf_crm_uf = EXCLUDED.uf_crm_uf;
+                responsavel_pela_venda = EXCLUDED.responsavel_pela_venda;
             """,
             (
                 deal.get("ID"),
@@ -146,6 +165,7 @@ def upsert_deal(conn, deal):
                 deal.get("UF_CRM_1731588487"),     # cidade
                 deal.get("UF_CRM_1700661252544"),  # número
                 deal.get("UF_CRM_1731589190"),     # uf
+                get_responsible_name(deal.get("UF_CRM_1699475211222")) # responsavel pela venda
             ),
         )
 

@@ -137,8 +137,8 @@ def upsert_deal(conn, deal):
                 uf_crm_bairro = EXCLUDED.uf_crm_bairro,
                 uf_crm_cidade = EXCLUDED.uf_crm_cidade,
                 uf_crm_numero = EXCLUDED.uf_crm_numero,
-                uf_crm_uf = EXCLUDED.uf_crm_uf;
-                respoonsavel_pela_venda = EXCLUDED.respoonsavel_pela_venda;
+                uf_crm_uf = EXCLUDED.uf_crm_uf,
+                respoonsavel_pela_venda = EXCLUDED.respoonsavel_pela_venda
             """,
             (
                 deal.get("ID"),

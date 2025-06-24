@@ -38,6 +38,8 @@ def get_stages_with_retry(cat_id, max_retries=5, base_wait=2):
 def bitrix_webhook():
     print("🔔 Webhook recebido")
 
+    conn = get_conn()
+
     try:
         form_data = request.form.to_dict(flat=False)
         print("📦 Form recebido:", form_data)

@@ -96,6 +96,9 @@ def bitrix_webhook():
     except Exception as e:
         print(f"❌ Erro ao processar webhook: {e}")
         return jsonify({"error": str(e)}), 500
+    finally :
+        if conn :
+            conn.close()
 
 
 if __name__ == "__main__":

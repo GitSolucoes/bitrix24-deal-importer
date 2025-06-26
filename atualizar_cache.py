@@ -61,6 +61,7 @@ PARAMS = {
         "UF_CRM_1699452141037",  # Quais operadoras tem viabilidade?
         "UF_CRM_1699475211222", # Consultor responsavel pela venda
         "UF_CRM_1700663313965", # BKO responsavel pelo input
+        "UF_CRM_1714143720", # Data do input
         "DATE_CREATE",
     ],
     "filter[>=DATE_CREATE]": "2021-01-01",
@@ -114,10 +115,6 @@ def get_bko_name (id) :
 
     return responsible_name
 
-
-
-
-
 def upsert_deal(conn, deal):
     with conn.cursor() as cur:
         cur.execute(
@@ -127,9 +124,9 @@ def upsert_deal(conn, deal):
                 contato01, contato02, ordem_de_servico, nome_do_cliente, nome_da_mae,
                 data_de_vencimento, email, cpf, rg, referencia, rua, data_de_instalacao,
                 quais_operadoras_tem_viabilidade,
-                uf_crm_bairro, uf_crm_cidade, uf_crm_numero, uf_crm_uf, respoonsavel_pela_venda, bko_input
+                uf_crm_bairro, uf_crm_cidade, uf_crm_numero, uf_crm_uf, respoonsavel_pela_venda, bko_input, data_input
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO UPDATE SET
                 title = EXCLUDED.title,
                 stage_id = EXCLUDED.stage_id,
@@ -155,7 +152,8 @@ def upsert_deal(conn, deal):
                 uf_crm_numero = EXCLUDED.uf_crm_numero,
                 uf_crm_uf = EXCLUDED.uf_crm_uf,
                 respoonsavel_pela_venda = EXCLUDED.respoonsavel_pela_venda,
-                bko_input = EXCLUDED.bko_input
+                bko_input = EXCLUDED.bko_input,
+                data_input = EXCLUDED.data_input
             """,
             (
                 deal.get("ID"),
@@ -184,6 +182,7 @@ def upsert_deal(conn, deal):
                 deal.get("UF_CRM_1731589190"),     # uf
                 get_responsible_name(deal.get("UF_CRM_1699475211222")), # responsavel pela venda
                 get_bko_name(deal.get("UF_CRM_1700663313965")), # bko responsavel pelo input
+                deal.get("UF_CRM_1714143720"), # data do input
             ),
         )
 

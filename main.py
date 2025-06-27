@@ -66,7 +66,7 @@ def buscar_por_cep(cep):
                 """
                 SELECT "id", "title", "stage_id", "category_id", "uf_crm_cep", "uf_crm_contato", "date_create", "contato01", "contato02", "ordem_de_servico", "nome_do_cliente",
             "nome_da_mae", "data_de_vencimento", "email", "cpf", "rg", "referencia", "rua", "data_de_instalacao", "quais_operadoras_tem_viabilidade"
-                FROM deals
+                FROM bitrix
                 WHERE replace("uf_crm_cep", '-', '') = %s;
             """,
                 (cep_limpo,),
@@ -124,7 +124,7 @@ def buscar_varios_ceps(lista_ceps):
                 """
                 SELECT "id", "title", "stage_id", "category_id", "uf_crm_cep", "uf_crm_contato", "date_create", "contato01", "contato02", "ordem_de_servico", "nome_do_cliente",
             "nome_da_mae", "data_de_vencimento", "email", "cpf", "rg", "referencia", "rua", "data_de_instalacao", "quais_operadoras_tem_viabilidade"
-                FROM deals
+                FROM bitrix
                 WHERE replace("uf_crm_cep", '-', '') = ANY(%s);
             """,
                 (ceps_limpos),
